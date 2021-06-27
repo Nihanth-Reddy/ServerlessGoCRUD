@@ -1,0 +1,32 @@
+service: serverlessproject
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: go1.x
+  stage: dev
+  region: us-east-2
+  lambdaHashingVersion: 20201221
+
+package:
+  patterns:
+    - '!./**'
+    - ./bin/**
+
+functions:
+  hello:
+    handler: bin/users
+    events:
+      - http:
+          path: /users
+          method: get
+      - http:
+          path: /users
+          method: post
+      - http:
+          path: /users
+          method: put
+      - http:
+          path: /users
+          method: delete
