@@ -7,21 +7,43 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
-func main() {
-	lambda.Start(handler)
+type helperFunc func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)
+
+type Deps struct {
+	Fu helperFunc
+	Cu helperFunc
+	Uu helperFunc
+	Du helperFunc
 }
 
-func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+func main() {
+	d := Deps{}
+	lambda.Start(d.handler)
+}
+
+func (d *Deps) handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	log.Printf("Incoming request event is: %#v\n", req)
 	switch req.HTTPMethod {
 	case "GET":
-		return FetchUser(req)
+		if d.Fu == nil {
+			return FetchUser(req)
+		}
+		return d.Fu(req)
 	case "POST":
-		return CreateUser(req)
+		if d.Cu == nil {
+			return CreateUser(req)
+		}
+		return d.Cu(req)
 	case "PUT":
-		return UpdateUser(req)
+		if d.Uu == nil {
+			return UpdateUser(req)
+		}
+		return d.Uu(req)
 	case "DELETE":
-		return DeleteUser(req)
+		if d.Du == nil {
+			return DeleteUser(req)
+		}
+		return d.Du(req)
 	default:
 		log.Printf("Requested for unhandled method %#v", req.HTTPMethod)
 		response := events.APIGatewayProxyResponse{StatusCode: 405}

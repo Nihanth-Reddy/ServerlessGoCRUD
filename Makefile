@@ -13,3 +13,7 @@ deploy: clean build
 gomodgen:
 	chmod u+x gomod.sh
 	./gomod.sh
+
+test:
+	go test -v -cover -coverprofile=c.out ./...
+	go tool cover -html=c.out -o coverage.html

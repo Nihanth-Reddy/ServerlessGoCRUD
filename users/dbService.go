@@ -13,6 +13,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type Person struct {
+	UserId    string   `json:"user_id"`
+	FirstName string   `json:"first_name"`
+	LastName  string   `json:"last_name"`
+	Email     string   `json:"email"`
+	Age       int      `json:"age"`
+	Courses   []string `json:"courses"`
+}
+
+type CreateUserResponse struct {
+	UserId string `json:"user_id"`
+}
+
 const TableName = "GolangUsers"
 
 var person Person
@@ -22,18 +35,14 @@ func CreateUser(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 	dbClient := getDBClient()
 	err := json.Unmarshal([]byte(req.Body), &person)
 	if err != nil {
-		response.StatusCode = 400
-		log.Printf("Recieved an error while unmarshalling the request body: %v\n", err)
-		return response, nil
+		return errorResponse(response, 400, "Recieved an error while unmarshalling the request body: %v\n", err)
 	}
 
 	person.UserId = uuid.NewString()
 	log.Printf("Person Object for DB marshalling %#v\n", person)
 	attributeValue, err := dynamodbattribute.MarshalMap(person)
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Recieved an error while Marshalling the person struct: %v\n", err)
-		return response, nil
+		return errorResponse(response, 500, "Recieved an error while Marshalling the person struct: %v\n", err)
 	}
 
 	input := &dynamodb.PutItemInput{
@@ -43,9 +52,7 @@ func CreateUser(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 	_, err = dbClient.PutItem(input)
 
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Got error calling PutItem: %s", err)
-		return response, nil
+		return errorResponse(response, 500, "Got error calling PutItem: %s\n", err)
 	}
 	response.StatusCode = 201
 	response.Headers = map[string]string{"Content-Type": "application/json"}
@@ -53,9 +60,7 @@ func CreateUser(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 	res := CreateUserResponse{UserId: person.UserId}
 	res_str, err := json.MarshalIndent(res, "", "  ")
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Recieved an error while marshalling the response body: %v\n", err)
-		return response, nil
+		return errorResponse(response, 500, "Recieved an error while marshalling the response body: %v\n", err)
 	}
 	response.Body = string(res_str)
 	log.Printf("Response of the create user call is %#v\n", response)
@@ -79,29 +84,21 @@ func FetchUser(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespons
 	}
 	res, err := dbClient.GetItem(item)
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Got error calling GetItem: %s", err)
-		return response, nil
+		return errorResponse(response, 500, "Got error calling GetItem: %s", err)
 	}
 
 	if res.Item == nil {
-		response.StatusCode = 404
-		log.Printf("Couldn't get the users with id: %s", UserId)
-		return response, nil
+		return errorResponse(response, 404, "Couldn't get the users with id: "+UserId+"\n", nil)
 	}
 
 	err = dynamodbattribute.UnmarshalMap(res.Item, &person)
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Got error while Unmarshalling response: %s", err)
-		return response, nil
+		return errorResponse(response, 500, "Got error while Unmarshalling response: %s", err)
 	}
 
 	res_str, err := json.MarshalIndent(person, "", " ")
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Got error while marshalling response: %s", err)
-		return response, nil
+		return errorResponse(response, 500, "Got error while marshalling response: %s", err)
 	}
 
 	response.StatusCode = 200
@@ -119,9 +116,7 @@ func UpdateUser(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 
 	err := json.Unmarshal([]byte(req.Body), &person)
 	if err != nil {
-		response.StatusCode = 400
-		log.Printf("Recieved an error while unmarshalling the request body: %v\n", err)
-		return response, nil
+		return errorResponse(response, 400, "Recieved an error while unmarshalling the request body: %v\n", err)
 	}
 
 	person.UserId = UserId
@@ -129,9 +124,7 @@ func UpdateUser(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 	log.Printf("Person Object for DB marshalling %#v\n", person)
 	attributeValue, err := dynamodbattribute.MarshalMap(person)
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Recieved an error while Marshalling the person struct: %v\n", err)
-		return response, nil
+		return errorResponse(response, 500, "Recieved an error while Marshalling the person struct: %v\n", err)
 	}
 
 	input := &dynamodb.PutItemInput{
@@ -141,16 +134,12 @@ func UpdateUser(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 	_, err = dbClient.PutItem(input)
 
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Got error calling PutItem: %s", err)
-		return response, nil
+		return errorResponse(response, 500, "Got error calling PutItem: %s", err)
 	}
 
 	res_str, err := json.MarshalIndent(person, "", " ")
 	if err != nil {
-		response.StatusCode = 500
-		log.Printf("Got error while marshalling response: %s", err)
-		return response, nil
+		return errorResponse(response, 500, "Got error while marshalling response: %s", err)
 	}
 
 	response.StatusCode = 200
@@ -177,8 +166,7 @@ func DeleteUser(req events.APIGatewayProxyRequest) (events.APIGatewayProxyRespon
 
 	_, err := dbClient.DeleteItem(input)
 	if err != nil {
-		response.StatusCode = 500
-		return response, nil
+		return errorResponse(response, 500, "Got error while deleting the item from DB: %v", err)
 	}
 	response.StatusCode = 204
 	return response, nil
@@ -190,4 +178,10 @@ func getDBClient() dynamodbiface.DynamoDBAPI {
 	}))
 	ServiceClient := dynamodb.New(sess)
 	return ServiceClient
+}
+
+func errorResponse(res events.APIGatewayProxyResponse, code int, message string, err error) (events.APIGatewayProxyResponse, error) {
+	res.StatusCode = code
+	log.Printf(message, err)
+	return res, nil
 }
